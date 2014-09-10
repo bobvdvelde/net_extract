@@ -86,7 +86,7 @@ def extract_edges(table,from_colum, to_colum, split_char='', weight='count', kee
 
     return edges
 
-def flatten_two_to_one_mode(input_edge_set, method='crossprod', keep_matches=True, include_self_links=False):
+def flatten_two_to_one_mode(input_edge_set, method='count', keep_matches=True, include_self_links=False):
     ''' 
     transform a two mode network into a one mode network 
     
@@ -99,35 +99,35 @@ def flatten_two_to_one_mode(input_edge_set, method='crossprod', keep_matches=Tru
     
     '''
     
-    output_edges = defaultdict(lambda:defaultdict(lambda:{'Weight':0}))
+    output_edges = defaultdict(lambda:defaultdict(lambda:{'weight':0}))
     
     for f in input_edge_set.keys():
         for t in input_edge_set.keys():
-            if not include_elf_links and t==f:
+            if not include_self_links and t==f:
                 continue
             
             #combine links
             overlap = set(input_edge_set[t].keys()).intersection(set(input_edge_set[f].keys()))
             if keep_matches:
-                output_edgesp[f][t]['Based_on']= overlap
+                output_edges[f][t]['Based_on']= ';'.join(list(overlap))
 
             if method.lower() in ['newman_send','newman_binary']: 
                 #overlap based on the number of shared keys, relative to the total number of keys for the 'from' node
-                output_edges[f][t]['Weight'] = len(overlap) / float(len(input_edge_set[f].keys()))
+                output_edges[f][t]['weight'] = len(overlap) / float(len(input_edge_set[f].keys()))
 
             elif method.lower() == 'count':
                 #overlap weight is simply the number of shared items (undirected)
-                output_edges[f][t]['Weight'] = len(overlap)
+                output_edges[f][t]['weight'] = len(overlap)
 
             elif method.lower() == 'minimum':
                 #overlap is the minimum weight of either the 'to' or 'from' node in ALL overlapping second-mode nodes
                 ies = input_edge_set
-                output_edges[f][t]['Weight'] = min([ies[f][k] for k in overlap].extend([ies[t][k] for k in overlap]))
+                output_edges[f][t]['weight'] = min([ies[f][k] for k in overlap].extend([ies[t][k] for k in overlap]))
 
             elif method.lower() == 'maximum':
                 #overlap is the maximum weight of either the 'to' or 'from' node in ALL overlapping second-mode nodes
                 ies = input_edge_set
-                output_edges[f][t]['Weight'] = max([ies[f][k] for k in overlap].extend([ies[t][k] for k in overlap]))
+                output_edges[f][t]['weight'] = max([ies[f][k] for k in overlap].extend([ies[t][k] for k in overlap]))
 
             elif method.lower() == 'newman_received_min':
                 #overlap weight of the 'from' node is weighed for all receiving nodes, taking the minimal value,
@@ -136,8 +136,8 @@ def flatten_two_to_one_mode(input_edge_set, method='crossprod', keep_matches=Tru
                 # at a party is split equally between all attendees.
                 links = []
                 for k in overlap:
-                    links.append(float(input_edge_set[f][k]['Weight'])/len([o for o in input_edge_set if o.has_key(k)])-1)
-                output_edges[f][t]['Weight']=min(links)
+                    links.append(float(input_edge_set[f][k]['weight'])/len([o for o in input_edge_set if o.has_key(k)])-1)
+                output_edges[f][t]['weight']=min(links)
 
             elif method.lower() == 'newman_received_max':
                 #overlap weight of the 'from' node is weighed for all receiving nodes, taking the minimal value,
@@ -146,10 +146,24 @@ def flatten_two_to_one_mode(input_edge_set, method='crossprod', keep_matches=Tru
                 # at a party is split equally between all attendees.
                 links = []
                 for k in overlap:
-                    links.append(float(input_edge_set[f][k]['Weight'])/len([o for o in input_edge_set if o.has_key(k)])-1)
-                output_edges[f][t]['Weight']=max(links)
+                    links.append(float(input_edge_set[f][k]['weight'])/len([o for o in input_edge_set if o.has_key(k)])-1)
+                output_edges[f][t]['weight']=max(links)
             else:
                 raise UnknownMethodError('The method you specified is not implemented at this time... :-('.format(**locals()))
                 
     return output_edges
 
+def generate_networkx_edges(edges, graph):
+    ''' 
+    outputs the edges model of extract_network or flatten_two_mode_to_one_mode for networkx graphs 
+
+    example use:
+    
+    G = networkx.DiGraph()
+    G = generate_networkx_edges(edges, G)
+
+    '''
+    for f,ts in edges.iteritems():
+        for t in ts:
+            graph.add_edge( f, t, ts[t])
+    return graph
