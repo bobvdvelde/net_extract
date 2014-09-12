@@ -5,6 +5,9 @@ import csv,pickle,json
 class UnknownMethodException(Exception):
     pass
 
+class UnsupportedType(Exception):
+    pass
+
 def from_csv(filename, *args,**kwargs):
     ''' read a table from csv as a dictionairy ''' 
     return table
@@ -14,6 +17,32 @@ def from_pickle(filename):
 
 def from_json(filename):
     return json.load(open(filename))
+
+def find_key(item,key):
+    '''
+    Helper function to find keys recursivelys
+
+    table: the object (assumed to be a dict) which should contain the key
+    key  : the final key, whose corresponding value you whish to have
+
+    for example: there  is a dict
+    A = dict( alice=dict(age=23, profession='professor'), bob=dict(age='26',profession='dummy'))
+    find_key(A,'profession') will yield 'professor' or 'dummy' !a semi-random pick if the key is in multiple subdicts
+    find_key(A,'goals') will yield False 
+    
+    KEEP IN MIND: the key(s) in the first encountered 'level' are returned!
+
+    '''
+
+    if item.has_key(key): 
+        return item[key]
+    else:
+        combined_subdict = {}
+        [combined_subdict.update(d) for d in item if type(d)=='dict']
+        if len(combined_subdict)>0:
+            return find_key(combined_subdict,key)
+        else:
+            return False
 
 def extract_edges(table,from_colum, to_colum, split_char='', weight='count', keep_fields_list=[]):
     ''' 
@@ -44,15 +73,24 @@ def extract_edges(table,from_colum, to_colum, split_char='', weight='count', kee
     '''
     
     # Get the edges from the table 
-    edges = defaultdict(lambda:defaultdict(lambda:{'Weight':0})) # edges is a dict with key = from field, value = 'to':weight(default 0)
+    edges = defaultdict(lambda:defaultdict(lambda:{'weight':0})) # edges is a dict with key = from field, value = 'to':weight(default 0)
     for row in table:
-        if row.has_key(from_colum) and row.has_key(to_colum):
-            select = lambda x: split_char and row[x].split(split_char) or [row[x],]
+        if find_key(row,from_colum) and find_key(row,to_colum):
+            def select(colum):
+                item = find_key(row,from_colum)
+                if type(item) in ['str','unicode'] and split_char:
+                    return item.split(split_char)
+                elif type(item) in ['str','unicode']:
+                    return [item,]
+                elif type(item)=='list'):
+                    return item
+                else:
+                    raise UnsupportedType('Unsupported value type:  %s; perhaps you specified the wrong key?' %type(item))
             fs      = select(from_colum)
             ts      = select(to_colum)
             for f in fs:
                 for t in ts:
-                    edges[f][t]['Weight']+=1
+                    edges[f][t]['weight']+=1
                     
                     # Handle the addition of extra information from specified fields
                     if keep_fields_list:
@@ -152,6 +190,19 @@ def flatten_two_to_one_mode(input_edge_set, method='count', keep_matches=True, i
                 raise UnknownMethodError('The method you specified is not implemented at this time... :-('.format(**locals()))
                 
     return output_edges
+
+def links_as_node_property(input_edge_set, delim=';'):
+    '''
+    Generates a node property which is a string containing all links.
+
+    For instance: a node property which describes the event alice has been to, 
+                  so that these are clear after the network has been collapsed to a one-mode network.
+
+    '''
+    nodeset = {}
+    for f in input_edge_set.keys():
+        nodeset[f]=delim.join([ "%s (%s)" %(k,v['weight']) for k,v in input_edge_set[f].iteritems() if v.has_key('weight')])
+    return nodeset
 
 def generate_networkx_edges(edges, graph):
     ''' 
