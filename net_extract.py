@@ -48,7 +48,7 @@ def extract_edges(table,from_colum, to_colum, split_char='', weight='count', kee
     ''' 
     extract a weighted network 
     
-    table     : should be a list of dicts (presumably based on a table with headers)
+    table     : should be a list of dicts (presumably based on a table with headers, but may also by JSON output)
     from_colum: the colum specifying the 'sender'
     to_colum  : the colum specifying the 'receiver'
     weight    : the method to determine edge-weight, options include
@@ -78,11 +78,11 @@ def extract_edges(table,from_colum, to_colum, split_char='', weight='count', kee
         if find_key(row,from_colum) and find_key(row,to_colum):
             def select(colum):
                 item = find_key(row,from_colum)
-                if type(item) in ['str','unicode'] and split_char:
+                if type(item) in [str,unicode] and split_char:
                     return item.split(split_char)
-                elif type(item) in ['str','unicode']:
+                elif type(item) in [str,unicode]:
                     return [item,]
-                elif type(item)=='list'):
+                elif type(item)==list:
                     return item
                 else:
                     raise UnsupportedType('Unsupported value type:  %s; perhaps you specified the wrong key?' %type(item))
