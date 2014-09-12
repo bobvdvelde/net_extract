@@ -1,6 +1,6 @@
 ''' Basic network extraction script ''' 
 from collections import defaultdict
-import csv,pickle,json
+import csv,pickle,json,re
 
 class UnknownMethodException(Exception):
     pass
@@ -44,7 +44,7 @@ def find_key(item,key):
         else:
             return False
 
-def extract_edges(table,from_colum, to_colum, split_char='', weight='count', keep_fields_list=[]):
+def extract_edges(table,from_colum, to_colum, split_char='', weight='count', keep_fields_list=[],clean=False):
     ''' 
     extract a weighted network 
     
@@ -62,6 +62,8 @@ def extract_edges(table,from_colum, to_colum, split_char='', weight='count', kee
                 and one to bob!
     keep_field: optional list of fieldnames that should be included as link-properties.
                 Example: the 'subject' columns of all emails between 'from'=Alice and 'to'=bob
+    clean     : if True (1), node names are capitalized, stripped and punctiation is removed
+                Example: 'a-Lice \n' and 'alice' both end up as 'Alice'
     
     PLEASE NOTE: if the 'from' and 'to' colum are different type, 
     such as people & events, the resulting edgeset will be "two-mode" data.
@@ -90,6 +92,11 @@ def extract_edges(table,from_colum, to_colum, split_char='', weight='count', kee
             ts      = select(to_colum)
             for f in fs:
                 for t in ts:
+                    if clean: #The cleaning algorithm to reduce noise in data
+                        punct = re.compile('[\.\?\!\/\\\\[\]\{\},]')
+                        whites= re.compile('[\t\r\n ]')
+                        f = whites.sub('',punct.sub('',f)).strip().capitalize()
+                        t = whites.sub('',punct.sub('',f)).strip().capitalize()
                     edges[f][t]['weight']+=1
                     
                     # Handle the addition of extra information from specified fields
